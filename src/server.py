@@ -51,6 +51,12 @@ app = mcp.create_mcp_server(
 )
 
 
+# Import tools
+from .tools.search_companies import SearchCompaniesTool
+
+# Register tools
+mcp.add_tool(SearchCompaniesTool())
+
 # Health check endpoint (for development/testing)
 @mcp.tool()
 async def health_check() -> dict:
