@@ -1,0 +1,110 @@
+# Firmia MCP Server - Production Docker Compose
+version: '3.8'
+
+services:
+  firmia:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+      target: production
+    image: firmia:latest
+    container_name: firmia-mcp
+    restart: unless-stopped
+    ports:
+      - "8789:8789"
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379/0
+      - DUCKDB_PATH=/data/analytics.db
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8789
+    env_file:
+      - ../.env
+    volumes:
+      - firmia-data:/data
+      - firmia-logs:/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - firmia-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8789/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: firmia-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - firmia-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: firmia-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - firmia-network
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: firmia-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - firmia-network
+    depends_on:
+      - prometheus
+    profiles:
+      - monitoring
+
+volumes:
+  firmia-data:
+    driver: local
+  firmia-logs:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  firmia-network:
+    driver: bridge

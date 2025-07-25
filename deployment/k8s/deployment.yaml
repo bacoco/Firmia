@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: firmia-mcp-server
+  namespace: firmia
+  labels:
+    app: firmia-mcp
+    component: server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: firmia-mcp
+      component: server
+  template:
+    metadata:
+      labels:
+        app: firmia-mcp
+        component: server
+    spec:
+      serviceAccountName: firmia-sa
+      containers:
+      - name: firmia
+        image: ghcr.io/bacoco/firmia:latest
+        imagePullPolicy: Always
+        ports:
+        - name: mcp
+          containerPort: 8789
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: REDIS_URL
+          value: "redis://firmia-redis:6379/0"
+        - name: DUCKDB_PATH
+          value: "/data/analytics.db"
+        - name: MCP_HOST
+          value: "0.0.0.0"
+        - name: MCP_PORT
+          value: "8789"
+        envFrom:
+        - secretRef:
+            name: firmia-api-secrets
+        - configMapRef:
+            name: firmia-config
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: mcp
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: mcp
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: logs
+          mountPath: /logs
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: firmia-data-pvc
+      - name: logs
+        emptyDir: {}
+      nodeSelector:
+        node-role.kubernetes.io/worker: "true"
+      tolerations:
+      - key: "workload"
+        operator: "Equal"
+        value: "general"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - firmia-mcp
+              topologyKey: kubernetes.io/hostname

@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: firmia-mcp
+  namespace: firmia
+  labels:
+    app: firmia-mcp
+    component: server
+spec:
+  type: ClusterIP
+  selector:
+    app: firmia-mcp
+    component: server
+  ports:
+  - name: mcp
+    port: 8789
+    targetPort: mcp
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: firmia-redis
+  namespace: firmia
+  labels:
+    app: firmia-mcp
+    component: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: firmia-mcp
+    component: redis
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+    protocol: TCP

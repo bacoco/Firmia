@@ -1,0 +1,111 @@
+# Firmia MCP Server - Development Docker Compose with hot reload
+version: '3.8'
+
+services:
+  firmia-dev:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.dev
+    image: firmia:dev
+    container_name: firmia-mcp-dev
+    restart: unless-stopped
+    ports:
+      - "8789:8789"
+      - "5678:5678"  # Python debugger port
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=redis://redis:6379/0
+      - DUCKDB_PATH=/data/analytics.db
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8789
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ../.env
+    volumes:
+      - ../src:/app/src:ro  # Mount source code for hot reload
+      - ../tests:/app/tests:ro
+      - firmia-data:/data
+      - firmia-logs:/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - firmia-dev-network
+    command: ["uvicorn", "src.server:app", "--host", "0.0.0.0", "--port", "8789", "--reload"]
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: firmia-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - firmia-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Commander for development
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: firmia-redis-commander
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    networks:
+      - firmia-dev-network
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+  # DuckDB Web UI (if available)
+  duckdb-web:
+    image: duckdb/duckdb:latest
+    container_name: firmia-duckdb-web
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    volumes:
+      - firmia-data:/data:ro
+    networks:
+      - firmia-dev-network
+    command: ["duckdb", "/data/analytics.db", "-readonly"]
+    profiles:
+      - tools
+
+  # Jupyter notebook for data exploration
+  jupyter:
+    image: jupyter/datascience-notebook:latest
+    container_name: firmia-jupyter
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - ../notebooks:/home/jovyan/work
+      - firmia-data:/data:ro
+    networks:
+      - firmia-dev-network
+    profiles:
+      - tools
+
+volumes:
+  firmia-data:
+    driver: local
+  firmia-logs:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  firmia-dev-network:
+    driver: bridge

@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: firmia-config
+  namespace: firmia
+  labels:
+    app: firmia-mcp
+data:
+  # Rate limits (requests per minute)
+  RATE_LIMIT_RECHERCHE_ENTREPRISES: "3000"
+  RATE_LIMIT_INSEE_SIRENE: "30"
+  RATE_LIMIT_INPI_RNE: "20"
+  RATE_LIMIT_API_ENTREPRISE_JSON: "250"
+  RATE_LIMIT_API_ENTREPRISE_PDF: "50"
+  RATE_LIMIT_BODACC: "600"
+  RATE_LIMIT_RNA: "10"
+  RATE_LIMIT_RGE: "600"
+  RATE_LIMIT_FICOBA: "200"
+  
+  # Cache TTLs (seconds)
+  CACHE_TTL_SEARCH: "300"
+  CACHE_TTL_COMPANY: "3600"
+  CACHE_TTL_DOCUMENT: "86400"
+  
+  # Circuit breaker settings
+  CIRCUIT_BREAKER_FAILURE_THRESHOLD: "5"
+  CIRCUIT_BREAKER_RECOVERY_TIMEOUT: "60"
+  
+  # OpenTelemetry
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  
+  # AWS configuration
+  AWS_REGION: "eu-west-1"
+  AWS_SECRETS_PREFIX: "fci-mcp/"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: firmia-api-secrets
+  namespace: firmia
+  labels:
+    app: firmia-mcp
+type: Opaque
+stringData:
+  # INSEE OAuth2 credentials
+  INSEE_CLIENT_ID: "your-insee-client-id"
+  INSEE_CLIENT_SECRET: "your-insee-client-secret"
+  
+  # INPI JWT credentials
+  INPI_USERNAME: "your-inpi-username"
+  INPI_PASSWORD: "your-inpi-password"
+  
+  # API Entreprise token
+  API_ENTREPRISE_TOKEN: "your-api-entreprise-token"
+  
+  # DGFIP OAuth2 credentials (optional)
+  DGFIP_CLIENT_ID: ""
+  DGFIP_CLIENT_SECRET: ""
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: firmia-sa
+  namespace: firmia
+  labels:
+    app: firmia-mcp
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: firmia-data-pvc
+  namespace: firmia
+  labels:
+    app: firmia-mcp
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
