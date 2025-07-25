@@ -254,3 +254,67 @@ class INPIRNEAPI(BaseAPIClient):
             return response.status_code == 200
         except Exception:
             return False
+    
+    async def download_from_url(self, url: str) -> bytes:
+        """Download document content from INPI URL."""
+        try:
+            # INPI provides direct download URLs
+            # We need to make a direct request with auth headers
+            headers = await self.get_headers()
+            
+            response = await self._make_request(
+                "GET",
+                url,
+                headers=headers,
+                timeout=30  # Longer timeout for documents
+            )
+            
+            # Response should be raw bytes for PDF
+            return response
+            
+        except Exception as e:
+            self.logger.error("inpi_document_download_failed",
+                            url=url,
+                            error=str(e))
+            raise
+    
+    async def get_act_details(self, siren: str, act_id: str) -> Optional[Dict[str, Any]]:
+        """Get details for a specific act/document."""
+        try:
+            response = await self.get(f"/companies/{siren}/acts/{act_id}")
+            data = response.json()
+            
+            return {
+                "id": data.get("id"),
+                "type": "acte",
+                "name": data.get("name"),
+                "date_depot": data.get("dateDepot"),
+                "download_url": data.get("downloadUrl"),
+                "filename": data.get("filename")
+            }
+            
+        except APIError as e:
+            if e.status_code == 404:
+                return None
+            raise
+    
+    async def get_document_info(self, siren: str, document_id: str) -> Optional[Dict[str, Any]]:
+        """Get information about a specific document."""
+        try:
+            response = await self.get(f"/companies/{siren}/documents/{document_id}")
+            data = response.json()
+            
+            return {
+                "id": data.get("id"),
+                "type": data.get("type"),
+                "name": data.get("name"),
+                "date_depot": data.get("dateDepot"),
+                "download_url": data.get("downloadUrl"),
+                "filename": data.get("filename"),
+                "size": data.get("size")
+            }
+            
+        except APIError as e:
+            if e.status_code == 404:
+                return None
+            raise

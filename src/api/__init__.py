@@ -4,6 +4,7 @@ from .base import BaseAPIClient, PaginatedAPIClient, APIError, RateLimitError, A
 from .recherche_entreprises import RechercheEntreprisesAPI
 from .insee_sirene import INSEESireneAPI
 from .inpi_rne import INPIRNEAPI
+from .api_entreprise import APIEntrepriseAPI
 
 __all__ = [
     # Base classes
@@ -16,4 +17,5 @@ __all__ = [
     "RechercheEntreprisesAPI",
     "INSEESireneAPI",
     "INPIRNEAPI",
+    "APIEntrepriseAPI",
 ]

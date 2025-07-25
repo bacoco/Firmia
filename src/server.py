@@ -53,9 +53,14 @@ app = mcp.create_mcp_server(
 
 # Import tools
 from .tools.search_companies import SearchCompaniesTool
+from .tools.get_company_profile import GetCompanyProfileTool
+from .tools.download_document import DownloadDocumentTool, ListDocumentsTool
 
 # Register tools
 mcp.add_tool(SearchCompaniesTool())
+mcp.add_tool(GetCompanyProfileTool())
+mcp.add_tool(DownloadDocumentTool())
+mcp.add_tool(ListDocumentsTool())
 
 # Health check endpoint (for development/testing)
 @mcp.tool()
