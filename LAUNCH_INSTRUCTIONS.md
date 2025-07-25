@@ -13,12 +13,27 @@ Ensure you have:
 
 ### 2. Launch the Server
 
-From the Firmia directory:
+From the Firmia directory, you have three server options:
 
+#### Option A: Basic Server (2 test tools)
 ```bash
 cd /Users/loic/develop/pappersv2/Firmia
 source .venv/bin/activate
 python -m src.server_new
+```
+
+#### Option B: Demo Server (23 tools with mock data)
+```bash
+cd /Users/loic/develop/pappersv2/Firmia
+source .venv/bin/activate
+python -m src.server_demo
+```
+
+#### Option C: Full Server (23 tools with real APIs - requires credentials)
+```bash
+cd /Users/loic/develop/pappersv2/Firmia
+source .venv/bin/activate
+python -m src.server_full
 ```
 
 The server will start in stdio mode, waiting for MCP client connections.
@@ -89,12 +104,29 @@ The following APIs work without any credentials:
 
 To use with Claude Desktop, add to your MCP settings:
 
+#### For Demo Server (recommended for testing):
+```json
+{
+  "servers": {
+    "firmia-demo": {
+      "command": "python",
+      "args": ["-m", "src.server_demo"],
+      "cwd": "/Users/loic/develop/pappersv2/Firmia",
+      "env": {
+        "PYTHONPATH": "/Users/loic/develop/pappersv2/Firmia"
+      }
+    }
+  }
+}
+```
+
+#### For Full Server (requires API credentials):
 ```json
 {
   "servers": {
     "firmia": {
       "command": "python",
-      "args": ["-m", "src.server_new"],
+      "args": ["-m", "src.server_full"],
       "cwd": "/Users/loic/develop/pappersv2/Firmia",
       "env": {
         "PYTHONPATH": "/Users/loic/develop/pappersv2/Firmia"
