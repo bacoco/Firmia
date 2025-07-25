@@ -3,7 +3,7 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
-from fastmcp import Tool
+from mcp.server.fastmcp import Tool
 from pydantic import Field
 from structlog import get_logger
 

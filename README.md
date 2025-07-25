@@ -88,7 +88,8 @@ The server exposes 23 MCP tools organized by category:
 ### Prerequisites
 
 - Python 3.12+
-- Redis server
+- uv (recommended) or pip
+- Redis server (optional - server runs without it)
 - Docker (optional)
 
 ### Installation
@@ -98,50 +99,62 @@ The server exposes 23 MCP tools organized by category:
 git clone https://github.com/bacoco/Firmia.git
 cd Firmia
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Create virtual environment (using uv is recommended)
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install MCP SDK (already included in repo)
+uv pip install -e ./mcp-python-sdk
 
 # Install dependencies
-pip install -e ".[dev]"
+uv pip install -r requirements_dev.txt
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env with your API credentials
+# Edit .env with your API credentials (optional - public APIs work without auth)
 
 # Run the server
-python -m firmia.server
+python -m src.server_new
 ```
 
 ### Environment Variables
 
-Required API credentials in `.env`:
+API credentials in `.env` (optional - many APIs work without authentication):
 
 ```env
-# INSEE OAuth2
+# INSEE OAuth2 (optional)
 INSEE_CLIENT_ID=your-insee-client-id
 INSEE_CLIENT_SECRET=your-insee-client-secret
 
-# INPI JWT
+# INPI JWT (optional)
 INPI_USERNAME=your-inpi-username
 INPI_PASSWORD=your-inpi-password
 
-# API Entreprise
+# API Entreprise (optional)
 API_ENTREPRISE_TOKEN=your-api-entreprise-token
 
-# Redis
+# Redis (optional - server runs without it)
 REDIS_URL=redis://localhost:6379/0
 
-# Optional
+# DGFIP OAuth2 (optional)
 DGFIP_CLIENT_ID=your-dgfip-client-id
 DGFIP_CLIENT_SECRET=your-dgfip-client-secret
 ```
 
+**Note:** The following APIs work without any credentials:
+- Recherche Entreprises (company search)
+- BODACC (legal announcements)
+- RNA (associations)
+- RGE (environmental certifications)
+
 ### Available Scripts
 
 ```bash
-# Development server with auto-reload
-uvicorn firmia.server:app --reload --port 8789
+# Run the MCP server
+python -m src.server_new
+
+# Test the server
+python test_mcp_server.py
 
 # Run tests
 pytest
@@ -157,6 +170,22 @@ ruff check src
 
 # Format code
 black src tests
+```
+
+### Using with Claude Desktop
+
+To use Firmia with Claude Desktop, add to your MCP settings:
+
+```json
+{
+  "servers": {
+    "firmia": {
+      "command": "python",
+      "args": ["-m", "src.server_new"],
+      "cwd": "/path/to/Firmia"
+    }
+  }
+}
 ```
 
 ## 📁 Project Structure

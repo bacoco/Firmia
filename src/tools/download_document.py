@@ -5,7 +5,7 @@ import base64
 from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime, timedelta
 
-from fastmcp import Tool
+from mcp.server.fastmcp import Tool
 from pydantic import Field
 from structlog import get_logger
 

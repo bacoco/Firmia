@@ -3,7 +3,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from structlog import get_logger
 
 from .config import settings
@@ -44,11 +44,8 @@ mcp = FastMCP(
     version="0.1.0"
 )
 
-# Configure server with lifespan
-app = mcp.create_mcp_server(
-    transport="stdio",
-    lifespan=lifespan
-)
+# Configure the MCP server with lifespan
+mcp.lifespan = lifespan
 
 
 # Import tools
@@ -123,14 +120,9 @@ async def health_check() -> dict:
 # Main entry point
 def main():
     """Run the MCP server."""
-    import uvicorn
-    
-    uvicorn.run(
-        app,
-        host=settings.mcp_host,
-        port=settings.mcp_port,
-        log_level=settings.log_level.lower()
-    )
+    # Run the server with stdio transport by default
+    # Can be changed to "sse" or "streamable-http" if needed
+    mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":
