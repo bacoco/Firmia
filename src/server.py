@@ -70,6 +70,18 @@ from .tools.check_certifications import (
     SearchCertifiedCompaniesTool,
     GetCertificationDomainsTool
 )
+from .tools.company_analytics import (
+    GetCompanyHealthScoreTool,
+    GetCompanyAnalyticsTool,
+    GetMarketAnalyticsTool,
+    GetTrendAnalysisTool,
+    UpdateStaticDataTool,
+    GetPipelineStatusTool
+)
+from .tools.export_data import (
+    ExportDataTool,
+    BatchOperationTool
+)
 
 # Register tools
 mcp.add_tool(SearchCompaniesTool())
@@ -85,6 +97,14 @@ mcp.add_tool(CheckIfAssociationTool())
 mcp.add_tool(CheckCertificationsTool())
 mcp.add_tool(SearchCertifiedCompaniesTool())
 mcp.add_tool(GetCertificationDomainsTool())
+mcp.add_tool(GetCompanyHealthScoreTool())
+mcp.add_tool(GetCompanyAnalyticsTool())
+mcp.add_tool(GetMarketAnalyticsTool())
+mcp.add_tool(GetTrendAnalysisTool())
+mcp.add_tool(UpdateStaticDataTool())
+mcp.add_tool(GetPipelineStatusTool())
+mcp.add_tool(ExportDataTool())
+mcp.add_tool(BatchOperationTool())
 
 # Health check endpoint (for development/testing)
 @mcp.tool()
