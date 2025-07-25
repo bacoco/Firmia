@@ -14,7 +14,7 @@ from ..models.company import (
     CompanySearchResult,
     Pagination
 )
-from ..api import RechercheEntreprisesAPI, INSEESireneAPI
+from ..api import RechercheEntreprisesAPI, INSEESireneAPI, RNAAPI
 from ..cache import get_cache_manager
 from ..privacy import apply_privacy_filters
 
@@ -27,6 +27,7 @@ class CompanySearchOrchestrator:
     def __init__(self):
         self.recherche_api = RechercheEntreprisesAPI()
         self.insee_api = INSEESireneAPI()
+        self.rna_api = RNAAPI()
         self.cache_manager = get_cache_manager()
         self.logger = logger.bind(component="search_orchestrator")
     
@@ -58,8 +59,7 @@ class CompanySearchOrchestrator:
         
         # Search associations if requested
         if params.include_associations:
-            # RNA API would be added here
-            pass
+            tasks.append(self._search_associations(params))
         
         # Execute searches in parallel
         self.logger.info("executing_parallel_search", 
@@ -273,11 +273,12 @@ class CompanySearchOrchestrator:
         new_data: CompanySearchResult
     ) -> CompanySearchResult:
         """Merge data from multiple sources for the same company."""
-        # Priority: INPI RNE > INSEE > Recherche Entreprises > Static
+        # Priority: INPI RNE > INSEE > Recherche Entreprises > RNA > Static
         source_priority = {
-            "inpi_rne": 4,
-            "insee_sirene": 3,
-            "recherche_entreprises": 2,
+            "inpi_rne": 5,
+            "insee_sirene": 4,
+            "recherche_entreprises": 3,
+            "rna": 2,  # Associations
             "sirene": 1  # Static data
         }
         
@@ -336,10 +337,66 @@ class CompanySearchOrchestrator:
         """Generate cache key for search parameters."""
         return f"search:{params.query}:{params.page}:{params.per_page}:{params.filters}"
     
+    async def _search_associations(
+        self,
+        params: SearchCompaniesInput
+    ) -> Dict[str, Any]:
+        """Search using RNA API for associations."""
+        try:
+            result = await self.rna_api.search_associations(
+                query=params.query,
+                postal_code=params.filters.postal_code if params.filters else None,
+                page=params.page,
+                per_page=params.per_page
+            )
+            
+            # Convert associations to CompanySearchResult format
+            converted_results = []
+            for assoc in result["associations"]:
+                converted = CompanySearchResult(
+                    siren=assoc.get("siren", ""),
+                    name=assoc["name"],
+                    siret=assoc.get("siret"),
+                    naf_code="",  # Associations don't have NAF
+                    legal_form="Association",
+                    is_active=assoc.get("is_active", True),
+                    address=assoc.get("address", {}),
+                    establishment_count=1,
+                    employee_range="",
+                    executives=[],
+                    source="rna",
+                    metadata={
+                        "rna_id": assoc["rna_id"],
+                        "is_public_utility": assoc.get("is_public_utility", False),
+                        "object": assoc.get("object"),
+                        "type": "association"
+                    }
+                )
+                converted_results.append(converted)
+            
+            self.logger.info("rna_search_results",
+                           count=len(converted_results),
+                           total=result["total"])
+            
+            return {
+                "results": converted_results,
+                "pagination": {
+                    "total": result["total"],
+                    "page": params.page,
+                    "per_page": params.per_page,
+                    "total_pages": (result["total"] + params.per_page - 1) // params.per_page
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error("rna_search_failed", error=str(e))
+            return {"results": [], "pagination": None}
+    
     async def close(self) -> None:
         """Close API clients."""
         await self.recherche_api.close()
         await self.insee_api.close()
+        await self.rna_api.close()
 
 
 class SearchCompaniesTool(Tool):

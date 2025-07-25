@@ -5,6 +5,9 @@ from .recherche_entreprises import RechercheEntreprisesAPI
 from .insee_sirene import INSEESireneAPI
 from .inpi_rne import INPIRNEAPI
 from .api_entreprise import APIEntrepriseAPI
+from .bodacc import BODACCAPI
+from .rna import RNAAPI
+from .rge import RGEAPI
 
 __all__ = [
     # Base classes
@@ -18,4 +21,7 @@ __all__ = [
     "INSEESireneAPI",
     "INPIRNEAPI",
     "APIEntrepriseAPI",
+    "BODACCAPI",
+    "RNAAPI", 
+    "RGEAPI",
 ]

@@ -55,12 +55,36 @@ app = mcp.create_mcp_server(
 from .tools.search_companies import SearchCompaniesTool
 from .tools.get_company_profile import GetCompanyProfileTool
 from .tools.download_document import DownloadDocumentTool, ListDocumentsTool
+from .tools.search_legal_announcements import (
+    SearchLegalAnnouncementsTool,
+    GetAnnouncementTimelineTool,
+    CheckFinancialHealthTool
+)
+from .tools.search_associations import (
+    SearchAssociationsTool,
+    GetAssociationDetailsTool,
+    CheckIfAssociationTool
+)
+from .tools.check_certifications import (
+    CheckCertificationsTool,
+    SearchCertifiedCompaniesTool,
+    GetCertificationDomainsTool
+)
 
 # Register tools
 mcp.add_tool(SearchCompaniesTool())
 mcp.add_tool(GetCompanyProfileTool())
 mcp.add_tool(DownloadDocumentTool())
 mcp.add_tool(ListDocumentsTool())
+mcp.add_tool(SearchLegalAnnouncementsTool())
+mcp.add_tool(GetAnnouncementTimelineTool())
+mcp.add_tool(CheckFinancialHealthTool())
+mcp.add_tool(SearchAssociationsTool())
+mcp.add_tool(GetAssociationDetailsTool())
+mcp.add_tool(CheckIfAssociationTool())
+mcp.add_tool(CheckCertificationsTool())
+mcp.add_tool(SearchCertifiedCompaniesTool())
+mcp.add_tool(GetCertificationDomainsTool())
 
 # Health check endpoint (for development/testing)
 @mcp.tool()
