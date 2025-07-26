@@ -11,6 +11,7 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastmcp>=2.10.6",
     "httpx[http2]>=0.27",
     "pydantic>=2.7",
     "redis[hiredis]>=5.0",

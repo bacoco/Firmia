@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import random
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from structlog import get_logger
 
 from .config import settings

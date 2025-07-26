@@ -1,5 +1,5 @@
 # Core dependencies
-fastmcp>=0.9.3
+fastmcp>=2.10.6
 httpx[http2]>=0.27
 pydantic>=2.7
 redis[hiredis]>=5.0

@@ -4,8 +4,7 @@ import asyncio
 import os
 import json
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from fastmcp import Client
 
 # Create server parameters for stdio connection
 server_params = StdioServerParameters(

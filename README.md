@@ -9,7 +9,7 @@ Firmia is a production-grade MCP (Model Context Protocol) server that provides c
 ## 🛠️ Tech Stack
 
 - **Python 3.12**: Modern async Python with full type hints
-- **FastMCP**: MCP protocol implementation
+- **FastMCP 2.10+**: The fast, Pythonic way to build MCP servers
 - **Redis**: High-performance caching layer
 - **DuckDB**: Analytics and static data processing
 - **HTTPx**: Async HTTP client with HTTP/2 support
@@ -103,9 +103,6 @@ cd Firmia
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install MCP SDK (already included in repo)
-uv pip install -e ./mcp-python-sdk
-
 # Install dependencies
 uv pip install -r requirements_dev.txt
 
@@ -154,7 +151,7 @@ DGFIP_CLIENT_SECRET=your-dgfip-client-secret
 python -m src.server_new
 
 # Test the server
-python test_mcp_server.py
+python test_server.py
 
 # Run tests
 pytest

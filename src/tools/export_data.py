@@ -8,7 +8,6 @@ from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 import base64
 
-from mcp.server.fastmcp import Tool
 from pydantic import Field, BaseModel
 from structlog import get_logger
 
