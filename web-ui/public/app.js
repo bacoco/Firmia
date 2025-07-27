@@ -219,15 +219,28 @@ class FirmiaUI {
         
         const timestamp = new Date().toLocaleTimeString();
         
+        // Format content based on data type
+        let content = '';
+        if (title === 'Search Enterprises' && data.success && data.result && data.result.content) {
+            content = this.formatSearchResults(data);
+        } else if (title === 'Get Enterprise Details' && data.success && data.result && data.result.content) {
+            content = this.formatEnterpriseDetails(data);
+        } else if (title === 'API Status' && data.success && data.result && data.result.content) {
+            content = this.formatApiStatus(data);
+        } else {
+            // Fallback to JSON display for other types
+            content = `<pre class="bg-gray-50 p-3 rounded text-sm overflow-x-auto"><code>${JSON.stringify(data, null, 2)}</code></pre>`;
+        }
+        
         resultDiv.innerHTML = `
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center justify-between mb-4">
                 <h4 class="font-semibold flex items-center">
                     <i class="fas ${this.getResultIcon(type)} mr-2"></i>
                     ${title}
                 </h4>
                 <span class="text-sm text-gray-500">${timestamp}</span>
             </div>
-            <pre class="bg-gray-50 p-3 rounded text-sm overflow-x-auto"><code>${JSON.stringify(data, null, 2)}</code></pre>
+            ${content}
         `;
         
         container.insertBefore(resultDiv, container.firstChild);
@@ -235,6 +248,134 @@ class FirmiaUI {
         // Limit to 10 results
         while (container.children.length > 10) {
             container.removeChild(container.lastChild);
+        }
+    }
+
+    formatSearchResults(data) {
+        try {
+            const results = JSON.parse(data.result.content[0].text);
+            
+            if (!results.success || !results.results) {
+                return `<div class="text-red-600">❌ Search failed</div>`;
+            }
+
+            let html = '<div class="space-y-4">';
+            
+            results.results.forEach(sourceResult => {
+                const sourceName = sourceResult.source.toUpperCase();
+                
+                html += `<div class="border-l-4 border-blue-500 pl-4">`;
+                html += `<h5 class="font-medium text-lg mb-2 text-blue-700"><i class="fas fa-building mr-2"></i>${sourceName}</h5>`;
+                
+                if (sourceResult.error) {
+                    html += `<div class="text-red-600 text-sm">❌ ${sourceResult.error}</div>`;
+                } else if (sourceResult.data && sourceResult.data.length > 0) {
+                    html += '<div class="overflow-x-auto">';
+                    html += '<table class="min-w-full divide-y divide-gray-200">';
+                    html += `
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">SIREN</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                    `;
+                    
+                    sourceResult.data.forEach(company => {
+                        const statusIcon = company.status === 'A' ? '✅' : company.status === 'C' ? '❌' : '❓';
+                        const statusText = company.status === 'A' ? 'Active' : company.status === 'C' ? 'Closed' : 'Unknown';
+                        
+                        html += `
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-3 py-2">
+                                    <div class="font-medium text-gray-900">${company.name || 'N/A'}</div>
+                                    <div class="text-sm text-gray-500">Form: ${company.legalForm || 'N/A'}</div>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <div class="text-sm font-mono">${company.siren}</div>
+                                    <div class="text-xs text-gray-500">${company.siret || ''}</div>
+                                </td>
+                                <td class="px-3 py-2 text-sm text-gray-500">${company.activity || 'N/A'}</td>
+                                <td class="px-3 py-2">
+                                    <span class="text-sm">${statusIcon} ${statusText}</span>
+                                </td>
+                                <td class="px-3 py-2 text-sm text-gray-500">${company.creationDate || 'N/A'}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += '</tbody></table></div>';
+                } else {
+                    html += '<div class="text-gray-500 text-sm">No data available</div>';
+                }
+                
+                html += '</div>';
+            });
+            
+            html += '</div>';
+            return html;
+            
+        } catch (error) {
+            return `<div class="text-red-600">❌ Error formatting results: ${error.message}</div>`;
+        }
+    }
+
+    formatEnterpriseDetails(data) {
+        // TODO: Format enterprise details nicely
+        return `<pre class="bg-gray-50 p-3 rounded text-sm overflow-x-auto"><code>${JSON.stringify(data, null, 2)}</code></pre>`;
+    }
+
+    formatApiStatus(data) {
+        try {
+            const results = JSON.parse(data.result.content[0].text);
+            
+            if (!results.success || !results.status) {
+                return `<div class="text-red-600">❌ Status check failed</div>`;
+            }
+
+            let html = '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">';
+            
+            Object.entries(results.status).forEach(([apiName, status]) => {
+                const isAvailable = status.available;
+                const statusColor = isAvailable ? 'green' : 'red';
+                const statusIcon = isAvailable ? '✅' : '❌';
+                
+                html += `
+                    <div class="border rounded-lg p-4 bg-${statusColor}-50 border-${statusColor}-200">
+                        <h6 class="font-medium text-${statusColor}-800">${statusIcon} ${apiName.toUpperCase()}</h6>
+                        <div class="mt-2 text-sm">
+                            <div class="text-${statusColor}-700">
+                                Status: <span class="font-medium">${isAvailable ? 'Available' : 'Unavailable'}</span>
+                            </div>
+                `;
+                
+                if (status.rateLimit) {
+                    html += `
+                            <div class="text-${statusColor}-600">
+                                Rate Limit: ${status.rateLimit.remaining || 'N/A'} remaining
+                            </div>
+                    `;
+                }
+                
+                if (status.error) {
+                    html += `<div class="text-red-600 text-xs mt-1">${status.error}</div>`;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            return html;
+            
+        } catch (error) {
+            return `<div class="text-red-600">❌ Error formatting API status: ${error.message}</div>`;
         }
     }
 
