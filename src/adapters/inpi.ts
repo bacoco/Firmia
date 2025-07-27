@@ -285,7 +285,7 @@ export class INPIAdapter implements BaseAdapter {
       await this.authenticate();
       
       // Make a simple request to check API status
-      await this.makeAuthenticatedRequest("/api/companies", { pageSize: 1 });
+      await this.makeAuthenticatedRequest("/companies", { pageSize: 1 });
 
       const rateLimit = await this.rateLimiter.getStatus("inpi");
 
@@ -339,23 +339,55 @@ export class INPIAdapter implements BaseAdapter {
   }
 
   private transformToEnterpriseDetails(
-    company: INPICompany, 
+    company: any, 
     intellectualProperty?: { trademarks: number; patents: number; designs: number }
   ): EnterpriseDetails {
+    // Use the same correct nested data extraction logic as transformToSearchResult
+    const siren = company.siren || company.formality?.siren || "";
+    const formality = company.formality || {};
+    const content = formality.content || {};
+    const personneMorale = content.personneMorale || {};
+    
+    // Extract company name from the correct nested structure
+    const identite = personneMorale.identite || {};
+    const entreprise = identite.entreprise || {};
+    const denomination = entreprise.denomination || "";
+    
+    // Extract address from the correct structure
+    const adresseEntreprise = personneMorale.adresseEntreprise || {};
+    const address = this.formatAddressFromINPI(adresseEntreprise, personneMorale, company);
+    
+    // Extract activity from entreprise data
+    const activite = entreprise.codeApe || company.activitySector || "";
+    
+    // Extract legal form
+    const formeJuridique = entreprise.formeJuridique || formality.formeJuridique || company.formeJuridique || "";
+    
+    // Extract creation date
+    const creationDate = entreprise.dateImmat || personneMorale.dateImmatriculation || company.dateCreation || "";
+    
+    // Extract financial data from description if available
+    const description = identite.description || {};
+    
     const basicInfo = {
-      siren: company.siren,
-      name: company.denomination || company.sigle || "",
-      legalForm: company.formeJuridique,
-      address: this.formatAddress(company),
-      activity: company.codeCategory || company.activitySector,
-      creationDate: company.dateCreation || company.dateImmatriculation,
-      status: this.determineStatus(company)
+      siren: siren,
+      name: denomination,
+      legalForm: formeJuridique,
+      address: address,
+      activity: activite,
+      creationDate: creationDate,
+      status: this.determineINPIStatus(company)
     };
 
-    const financials = company.capitalSocial || company.effectif ? {
-      revenue: company.capitalSocial,
-      employees: company.effectif,
-      lastUpdate: new Date().toISOString() // INPI doesn't provide this directly
+    // Extract financial information from INPI description
+    const financials = description.montantCapital || description.ess !== undefined ? {
+      revenue: description.montantCapital || undefined,
+      employees: undefined, // INPI doesn't provide employee count in details
+      capital: description.montantCapital || undefined,
+      currency: description.deviseCapital || undefined,
+      variableCapital: description.capitalVariable || undefined,
+      singleAssociate: description.indicateurAssocieUnique || undefined,
+      lastUpdate: new Date().toISOString()
     } : undefined;
 
     return {
@@ -475,7 +507,7 @@ export class INPIAdapter implements BaseAdapter {
 
     try {
       const company = await this.makeAuthenticatedRequest<INPICompany>(
-        `/api/companies/${siren}`
+        `/companies/${siren}`
       );
 
       const beneficialOwners = (company.representants || []).map(rep => ({
@@ -527,7 +559,7 @@ export class INPIAdapter implements BaseAdapter {
 
     try {
       const attachments = await this.makeAuthenticatedRequest<{ attachments: INPIAttachment[] }>(
-        `/api/companies/${siren}/attachments`
+        `/companies/${siren}/attachments`
       );
 
       let publications = (attachments.attachments || [])
@@ -611,7 +643,7 @@ export class INPIAdapter implements BaseAdapter {
       const response = await this.makeAuthenticatedRequest<{
         companies: INPICompany[];
         searchAfter?: string;
-      }>("/api/companies/diff", params);
+      }>("/companies/diff", params);
 
       const companies = (response.companies || []).map(company => ({
         siren: company.siren,
