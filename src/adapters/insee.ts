@@ -9,19 +9,55 @@ import type {
   AdapterStatus 
 } from "./index.js";
 
+interface INSEETokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
 export class INSEEAdapter implements BaseAdapter {
-  private readonly baseUrl = "https://api.insee.fr/entreprises/sirene/V3";
-  private readonly apiKey: string;
+  // Support both old and new API URLs
+  private readonly legacyBaseUrl = "https://api.insee.fr/entreprises/sirene/V3";
+  private readonly newBaseUrl = "https://api.insee.fr/api-sirene/3.11";
+  private readonly tokenUrl = "https://api.insee.fr/token";
+  
+  // Authentication configuration
+  private readonly legacyApiKey: string;
+  private readonly newApiKey: string;
+  private readonly clientId: string;
+  private readonly clientSecret: string;
+  
+  // Token management
+  private accessToken: string | null = null;
+  private tokenExpiry: Date | null = null;
+  
   private readonly rateLimiter: AdapterConfig["rateLimiter"];
   private readonly cache: AdapterConfig["cache"];
+  private readonly useNewApi: boolean;
 
   constructor(config: AdapterConfig) {
     this.rateLimiter = config.rateLimiter;
     this.cache = config.cache;
-    this.apiKey = process.env['INSEE_API_KEY'] || "";
     
-    if (!this.apiKey) {
-      console.warn("INSEE API key not found in environment variables");
+    // Legacy API key (for backwards compatibility)
+    this.legacyApiKey = process.env['INSEE_API_KEY'] || "";
+    
+    // New API configuration (OAuth2)
+    this.newApiKey = process.env['INSEE_API_KEY_INTEGRATION'] || "";
+    this.clientId = process.env['INSEE_CLIENT_ID'] || "";
+    this.clientSecret = process.env['INSEE_CLIENT_SECRET'] || "";
+    
+    // Determine which API to use
+    this.useNewApi = !!(this.newApiKey || (this.clientId && this.clientSecret));
+    
+    if (!this.useNewApi && !this.legacyApiKey) {
+      console.warn("INSEE API credentials not found. Please configure either legacy API key or new OAuth2 credentials.");
+    }
+    
+    if (this.useNewApi) {
+      console.log("Using new INSEE API with OAuth2 authentication");
+    } else {
+      console.log("Using legacy INSEE API with Bearer token");
     }
   }
 
@@ -38,6 +74,10 @@ export class INSEEAdapter implements BaseAdapter {
     await this.rateLimiter.acquire("insee");
 
     try {
+      // Get appropriate headers for authentication
+      const headers = await this.getAuthHeaders();
+      const baseUrl = this.useNewApi ? this.newBaseUrl : this.legacyBaseUrl;
+      
       // Check if query is a SIREN/SIRET number
       const isSiren = /^\d{9}$/.test(query);
       const isSiret = /^\d{14}$/.test(query);
@@ -48,18 +88,22 @@ export class INSEEAdapter implements BaseAdapter {
       };
 
       if (isSiren) {
-        endpoint = `${this.baseUrl}/siren/${query}`;
+        endpoint = `${baseUrl}/siren/${query}`;
       } else if (isSiret) {
-        endpoint = `${this.baseUrl}/siret/${query}`;
+        endpoint = `${baseUrl}/siret/${query}`;
       } else {
-        // Text search
-        endpoint = `${this.baseUrl}/siren`;
-        params['q'] = `denominationUniteLegale:"${query}"`;
+        // Text search - use different query format for new API
+        endpoint = `${baseUrl}/siren`;
+        if (this.useNewApi) {
+          params['q'] = `denominationUniteLegale:${query}`;
+        } else {
+          params['q'] = `denominationUniteLegale:"${query}"`;
+        }
       }
 
       const response = await axios.get(endpoint, {
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
+          ...headers,
           "Accept": "application/json"
         },
         params
@@ -92,9 +136,12 @@ export class INSEEAdapter implements BaseAdapter {
     await this.rateLimiter.acquire("insee");
 
     try {
-      const response = await axios.get(`${this.baseUrl}/siren/${siren}`, {
+      const headers = await this.getAuthHeaders();
+      const baseUrl = this.useNewApi ? this.newBaseUrl : this.legacyBaseUrl;
+      
+      const response = await axios.get(`${baseUrl}/siren/${siren}`, {
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
+          ...headers,
           "Accept": "application/json"
         }
       });
@@ -115,10 +162,13 @@ export class INSEEAdapter implements BaseAdapter {
 
   async getStatus(): Promise<AdapterStatus> {
     try {
+      const headers = await this.getAuthHeaders();
+      const baseUrl = this.useNewApi ? this.newBaseUrl : this.legacyBaseUrl;
+      
       // Make a simple request to check API availability
-      await axios.get(`${this.baseUrl}/informations`, {
+      await axios.get(`${baseUrl}/informations`, {
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
+          ...headers,
           "Accept": "application/json"
         }
       });
@@ -133,6 +183,71 @@ export class INSEEAdapter implements BaseAdapter {
         available: false,
         lastCheck: new Date()
       };
+    }
+  }
+
+  /**
+   * Get authentication headers based on the configured authentication method
+   */
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    if (this.useNewApi) {
+      if (this.newApiKey) {
+        // Use API key header method
+        return {
+          "X-INSEE-Api-Key-Integration": this.newApiKey
+        };
+      } else if (this.clientId && this.clientSecret) {
+        // Use OAuth2 access token
+        const token = await this.getAccessToken();
+        return {
+          "Authorization": `Bearer ${token}`
+        };
+      }
+    }
+    
+    // Fallback to legacy Bearer token
+    return {
+      "Authorization": `Bearer ${this.legacyApiKey}`
+    };
+  }
+
+  /**
+   * Get or refresh OAuth2 access token
+   */
+  private async getAccessToken(): Promise<string> {
+    // Check if we have a valid token
+    if (this.accessToken && this.tokenExpiry && new Date() < this.tokenExpiry) {
+      return this.accessToken;
+    }
+
+    // Get new token
+    try {
+      const credentials = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
+      
+      const response = await axios.post(this.tokenUrl, 
+        "grant_type=client_credentials",
+        {
+          headers: {
+            "Authorization": `Basic ${credentials}`,
+            "Content-Type": "application/x-www-form-urlencoded"
+          }
+        }
+      );
+
+      const tokenData: INSEETokenResponse = response.data;
+      this.accessToken = tokenData.access_token;
+      
+      // Set expiry time (subtract 5 minutes for safety)
+      this.tokenExpiry = new Date(Date.now() + (tokenData.expires_in - 300) * 1000);
+      
+      console.log(`INSEE OAuth2 token obtained, expires at: ${this.tokenExpiry.toISOString()}`);
+      
+      return this.accessToken;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(`INSEE OAuth2 token error: ${error.response?.data?.error_description || error.message}`);
+      }
+      throw error;
     }
   }
 
