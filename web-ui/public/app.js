@@ -159,6 +159,7 @@ class FirmiaUI {
 
         const params = {
             siren: siren,
+            source: document.getElementById('details-source').value,
             includeFinancials: document.getElementById('include-financials').checked,
             includeIntellectualProperty: document.getElementById('include-ip').checked
         };
@@ -223,7 +224,7 @@ class FirmiaUI {
         let content = '';
         if (title === 'Search Enterprises' && data.success && data.result && data.result.content) {
             content = this.formatSearchResults(data);
-        } else if (title === 'Get Enterprise Details' && data.success && data.result && data.result.content) {
+        } else if (title === 'Enterprise Details' && data.success && data.result && data.result.content) {
             content = this.formatEnterpriseDetails(data);
         } else if (title === 'API Status' && data.success && data.result && data.result.content) {
             content = this.formatApiStatus(data);
@@ -325,8 +326,86 @@ class FirmiaUI {
     }
 
     formatEnterpriseDetails(data) {
-        // TODO: Format enterprise details nicely
-        return `<pre class="bg-gray-50 p-3 rounded text-sm overflow-x-auto"><code>${JSON.stringify(data, null, 2)}</code></pre>`;
+        try {
+            const results = JSON.parse(data.result.content[0].text);
+            
+            if (!results.success) {
+                return `<div class="text-red-600">❌ Details request failed: ${results.error || 'Unknown error'}</div>`;
+            }
+
+            const siren = results.siren;
+            const details = results.details;
+            
+            if (!details || Object.keys(details).length === 0) {
+                return `<div class="text-yellow-600">⚠️ No details found for SIREN ${siren}</div>`;
+            }
+
+            let html = `<div class="space-y-6">`;
+            html += `<div class="text-lg font-semibold text-gray-800 border-b pb-2">Enterprise Details for SIREN: ${siren}</div>`;
+            
+            // Display details from each source
+            Object.entries(details).forEach(([sourceName, sourceData]) => {
+                html += `<div class="border-l-4 border-blue-500 pl-4">`;
+                html += `<h5 class="font-medium text-lg mb-3 text-blue-700"><i class="fas fa-building mr-2"></i>${sourceName.toUpperCase()}</h5>`;
+                
+                if (sourceData.error) {
+                    html += `<div class="text-red-600 text-sm">❌ ${sourceData.error}</div>`;
+                } else if (sourceData.basicInfo) {
+                    // Format basic info
+                    html += '<div class="bg-gray-50 rounded-lg p-4 mb-4">';
+                    html += '<h6 class="font-medium text-gray-800 mb-2">Basic Information</h6>';
+                    html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">';
+                    
+                    const basicInfo = sourceData.basicInfo;
+                    if (basicInfo.name) html += `<div><span class="font-medium">Name:</span> ${basicInfo.name}</div>`;
+                    if (basicInfo.legalForm) html += `<div><span class="font-medium">Legal Form:</span> ${basicInfo.legalForm}</div>`;
+                    if (basicInfo.address) html += `<div><span class="font-medium">Address:</span> ${basicInfo.address}</div>`;
+                    if (basicInfo.activity) html += `<div><span class="font-medium">Activity:</span> ${basicInfo.activity}</div>`;
+                    if (basicInfo.creationDate) html += `<div><span class="font-medium">Created:</span> ${basicInfo.creationDate}</div>`;
+                    if (basicInfo.status) html += `<div><span class="font-medium">Status:</span> ${basicInfo.status}</div>`;
+                    
+                    html += '</div></div>';
+                    
+                    // Format financials if available
+                    if (sourceData.financials) {
+                        html += '<div class="bg-green-50 rounded-lg p-4 mb-4">';
+                        html += '<h6 class="font-medium text-gray-800 mb-2">Financial Information</h6>';
+                        html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">';
+                        
+                        const financials = sourceData.financials;
+                        if (financials.revenue) html += `<div><span class="font-medium">Revenue:</span> ${financials.revenue}</div>`;
+                        if (financials.employees) html += `<div><span class="font-medium">Employees:</span> ${financials.employees}</div>`;
+                        if (financials.lastUpdate) html += `<div><span class="font-medium">Last Update:</span> ${financials.lastUpdate}</div>`;
+                        
+                        html += '</div></div>';
+                    }
+                    
+                    // Format intellectual property if available
+                    if (sourceData.intellectualProperty) {
+                        html += '<div class="bg-purple-50 rounded-lg p-4 mb-4">';
+                        html += '<h6 class="font-medium text-gray-800 mb-2">Intellectual Property</h6>';
+                        html += '<div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">';
+                        
+                        const ip = sourceData.intellectualProperty;
+                        if (ip.trademarks !== undefined) html += `<div><span class="font-medium">Trademarks:</span> ${ip.trademarks}</div>`;
+                        if (ip.patents !== undefined) html += `<div><span class="font-medium">Patents:</span> ${ip.patents}</div>`;
+                        if (ip.designs !== undefined) html += `<div><span class="font-medium">Designs:</span> ${ip.designs}</div>`;
+                        
+                        html += '</div></div>';
+                    }
+                } else {
+                    html += '<div class="text-gray-500 text-sm">No detailed information available</div>';
+                }
+                
+                html += '</div>';
+            });
+            
+            html += '</div>';
+            return html;
+            
+        } catch (error) {
+            return `<div class="text-red-600">❌ Error formatting enterprise details: ${error.message}</div>`;
+        }
     }
 
     formatApiStatus(data) {
