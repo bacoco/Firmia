@@ -45,6 +45,28 @@ const EnterpriseDetailSchema = z.object({
   includeIntellectualProperty: z.boolean().default(true)
 });
 
+// Define the schema for beneficial owners
+const BeneficialOwnersSchema = z.object({
+  siren: z.string().regex(/^\d{9}$/, "SIREN must be 9 digits")
+});
+
+// Define the schema for company publications
+const CompanyPublicationsSchema = z.object({
+  siren: z.string().regex(/^\d{9}$/, "SIREN must be 9 digits"),
+  type: z.enum(["ACTE", "BILAN", "ALL"]).default("ALL"),
+  from: z.string().optional().describe("Start date (YYYY-MM-DD)"),
+  to: z.string().optional().describe("End date (YYYY-MM-DD)"),
+  includeConfidential: z.boolean().default(false)
+});
+
+// Define the schema for differential updates
+const DifferentialUpdatesSchema = z.object({
+  from: z.string().describe("Start date (YYYY-MM-DD)"),
+  to: z.string().optional().describe("End date (YYYY-MM-DD)"),
+  pageSize: z.number().min(1).max(1000).default(100),
+  searchAfter: z.string().optional().describe("Pagination cursor")
+});
+
 // Register list_tools handler
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
@@ -63,6 +85,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "get_api_status",
         description: "Check the status and rate limits of connected APIs",
         inputSchema: z.object({})
+      },
+      {
+        name: "get_beneficial_owners",
+        description: "Get beneficial ownership information for a French enterprise (INPI only)",
+        inputSchema: BeneficialOwnersSchema
+      },
+      {
+        name: "get_company_publications",
+        description: "Get company publications and legal documents (INPI only)",
+        inputSchema: CompanyPublicationsSchema
+      },
+      {
+        name: "get_differential_updates",
+        description: "Get recent company changes and updates (INPI only)",
+        inputSchema: DifferentialUpdatesSchema
       }
     ]
   };
@@ -212,6 +249,118 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }]
       };
     }
+    }
+    
+    case "get_beneficial_owners": {
+      const { siren } = params as any;
+      
+      try {
+        const inpiAdapter = adapters["inpi"] as any;
+        if (!inpiAdapter || !inpiAdapter.getBeneficialOwners) {
+          throw new Error("INPI adapter not available or doesn't support beneficial owners");
+        }
+        
+        const beneficialOwners = await inpiAdapter.getBeneficialOwners(siren);
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              siren,
+              beneficialOwners
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error"
+            }, null, 2)
+          }]
+        };
+      }
+    }
+    
+    case "get_company_publications": {
+      const { siren, type, from, to, includeConfidential } = params as any;
+      
+      try {
+        const inpiAdapter = adapters["inpi"] as any;
+        if (!inpiAdapter || !inpiAdapter.getCompanyPublications) {
+          throw new Error("INPI adapter not available or doesn't support company publications");
+        }
+        
+        const options: any = { type, includeConfidential };
+        if (from) options.from = new Date(from);
+        if (to) options.to = new Date(to);
+        
+        const publications = await inpiAdapter.getCompanyPublications(siren, options);
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              siren,
+              publications
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error"
+            }, null, 2)
+          }]
+        };
+      }
+    }
+    
+    case "get_differential_updates": {
+      const { from, to, pageSize, searchAfter } = params as any;
+      
+      try {
+        const inpiAdapter = adapters["inpi"] as any;
+        if (!inpiAdapter || !inpiAdapter.getDifferentialUpdates) {
+          throw new Error("INPI adapter not available or doesn't support differential updates");
+        }
+        
+        const options: any = { 
+          from: new Date(from),
+          pageSize,
+          searchAfter
+        };
+        if (to) options.to = new Date(to);
+        
+        const updates = await inpiAdapter.getDifferentialUpdates(options);
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              updates
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error"
+            }, null, 2)
+          }]
+        };
+      }
     }
     
     default:

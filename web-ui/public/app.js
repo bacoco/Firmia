@@ -23,6 +23,11 @@ class FirmiaUI {
         document.getElementById('test-search').addEventListener('click', () => this.testSearchEnterprises());
         document.getElementById('test-details').addEventListener('click', () => this.testEnterpriseDetails());
         document.getElementById('test-status').addEventListener('click', () => this.testAPIStatus());
+        
+        // INPI Advanced Features
+        document.getElementById('test-beneficial').addEventListener('click', () => this.testBeneficialOwners());
+        document.getElementById('test-publications').addEventListener('click', () => this.testCompanyPublications());
+        document.getElementById('test-updates').addEventListener('click', () => this.testDifferentialUpdates());
 
         // Results management
         document.getElementById('clear-results').addEventListener('click', () => this.clearResults());
@@ -33,6 +38,12 @@ class FirmiaUI {
         });
         document.getElementById('details-siren').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.testEnterpriseDetails();
+        });
+        document.getElementById('beneficial-siren').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.testBeneficialOwners();
+        });
+        document.getElementById('publications-siren').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.testCompanyPublications();
         });
     }
 
@@ -207,6 +218,106 @@ class FirmiaUI {
         }
     }
 
+    async testBeneficialOwners() {
+        const siren = document.getElementById('beneficial-siren').value.trim();
+        if (!siren) {
+            alert('Please enter a SIREN number (9 digits)');
+            return;
+        }
+
+        if (!/^\d{9}$/.test(siren)) {
+            alert('SIREN must be exactly 9 digits');
+            return;
+        }
+
+        const params = { siren };
+
+        try {
+            this.showLoading();
+            const response = await fetch(`${this.apiBase}/mcp/test/get_beneficial_owners`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ params })
+            });
+            const result = await response.json();
+            
+            this.addResult('Beneficial Owners', result, result.success ? 'success' : 'error');
+        } catch (error) {
+            this.addResult('Beneficial Owners', { error: error.message }, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async testCompanyPublications() {
+        const siren = document.getElementById('publications-siren').value.trim();
+        if (!siren) {
+            alert('Please enter a SIREN number (9 digits)');
+            return;
+        }
+
+        if (!/^\d{9}$/.test(siren)) {
+            alert('SIREN must be exactly 9 digits');
+            return;
+        }
+
+        const params = {
+            siren: siren,
+            type: document.getElementById('publications-type').value,
+            includeConfidential: document.getElementById('include-confidential').checked
+        };
+
+        try {
+            this.showLoading();
+            const response = await fetch(`${this.apiBase}/mcp/test/get_company_publications`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ params })
+            });
+            const result = await response.json();
+            
+            this.addResult('Company Publications', result, result.success ? 'success' : 'error');
+        } catch (error) {
+            this.addResult('Company Publications', { error: error.message }, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async testDifferentialUpdates() {
+        const fromDate = document.getElementById('updates-from').value;
+        if (!fromDate) {
+            alert('Please select a start date');
+            return;
+        }
+
+        const params = {
+            from: fromDate,
+            pageSize: parseInt(document.getElementById('updates-pagesize').value) || 10
+        };
+
+        const toDate = document.getElementById('updates-to').value;
+        if (toDate) {
+            params.to = toDate;
+        }
+
+        try {
+            this.showLoading();
+            const response = await fetch(`${this.apiBase}/mcp/test/get_differential_updates`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ params })
+            });
+            const result = await response.json();
+            
+            this.addResult('Differential Updates', result, result.success ? 'success' : 'error');
+        } catch (error) {
+            this.addResult('Differential Updates', { error: error.message }, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
     addResult(title, data, type = 'info') {
         const container = document.getElementById('results-container');
         
@@ -228,6 +339,12 @@ class FirmiaUI {
             content = this.formatEnterpriseDetails(data);
         } else if (title === 'API Status' && data.success && data.result && data.result.content) {
             content = this.formatApiStatus(data);
+        } else if (title === 'Beneficial Owners' && data.success && data.result && data.result.content) {
+            content = this.formatBeneficialOwners(data);
+        } else if (title === 'Company Publications' && data.success && data.result && data.result.content) {
+            content = this.formatCompanyPublications(data);
+        } else if (title === 'Differential Updates' && data.success && data.result && data.result.content) {
+            content = this.formatDifferentialUpdates(data);
         } else {
             // Fallback to JSON display for other types
             content = `<pre class="bg-gray-50 p-3 rounded text-sm overflow-x-auto"><code>${JSON.stringify(data, null, 2)}</code></pre>`;
@@ -455,6 +572,200 @@ class FirmiaUI {
             
         } catch (error) {
             return `<div class="text-red-600">❌ Error formatting API status: ${error.message}</div>`;
+        }
+    }
+
+    formatBeneficialOwners(data) {
+        try {
+            const results = JSON.parse(data.result.content[0].text);
+            
+            if (!results.success) {
+                return `<div class="text-red-600">❌ Beneficial owners request failed: ${results.error || 'Unknown error'}</div>`;
+            }
+
+            const beneficialOwners = results.beneficialOwners || [];
+            const siren = results.siren;
+            
+            if (beneficialOwners.length === 0) {
+                return `<div class="text-yellow-600">⚠️ No beneficial owners found for SIREN ${siren}</div>`;
+            }
+
+            let html = `<div class="space-y-4">`;
+            html += `<div class="text-lg font-semibold text-gray-800 border-b pb-2">Beneficial Owners for SIREN: ${siren}</div>`;
+            
+            html += '<div class="overflow-x-auto">';
+            html += '<table class="min-w-full divide-y divide-gray-200">';
+            html += `
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Birth Date</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            beneficialOwners.forEach(owner => {
+                const typeIcon = owner.isCompany ? '🏢' : '👤';
+                const typeText = owner.isCompany ? 'Company' : 'Individual';
+                
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2">
+                            <div class="font-medium text-gray-900">${owner.name || 'N/A'}</div>
+                            ${owner.companySiren ? `<div class="text-xs text-gray-500">SIREN: ${owner.companySiren}</div>` : ''}
+                        </td>
+                        <td class="px-3 py-2 text-sm text-gray-500">${owner.role || 'N/A'}</td>
+                        <td class="px-3 py-2 text-sm">
+                            <span>${typeIcon} ${typeText}</span>
+                        </td>
+                        <td class="px-3 py-2 text-sm text-gray-500">${owner.birthDate || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div></div>';
+            return html;
+            
+        } catch (error) {
+            return `<div class="text-red-600">❌ Error formatting beneficial owners: ${error.message}</div>`;
+        }
+    }
+
+    formatCompanyPublications(data) {
+        try {
+            const results = JSON.parse(data.result.content[0].text);
+            
+            if (!results.success) {
+                return `<div class="text-red-600">❌ Publications request failed: ${results.error || 'Unknown error'}</div>`;
+            }
+
+            const publications = results.publications || [];
+            const siren = results.siren;
+            
+            if (publications.length === 0) {
+                return `<div class="text-yellow-600">⚠️ No publications found for SIREN ${siren}</div>`;
+            }
+
+            let html = `<div class="space-y-4">`;
+            html += `<div class="text-lg font-semibold text-gray-800 border-b pb-2">Company Publications for SIREN: ${siren}</div>`;
+            
+            html += '<div class="overflow-x-auto">';
+            html += '<table class="min-w-full divide-y divide-gray-200">';
+            html += `
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Document</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Download</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            publications.forEach(pub => {
+                const confidentialIcon = pub.confidential ? '🔒' : '📄';
+                const confidentialText = pub.confidential ? 'Confidential' : 'Public';
+                const typeIcon = pub.type === 'BILAN' ? '💰' : pub.type === 'ACTE' ? '📋' : '📄';
+                
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2">
+                            <div class="font-medium text-gray-900">${pub.name || 'N/A'}</div>
+                            <div class="text-xs text-gray-500">ID: ${pub.id}</div>
+                        </td>
+                        <td class="px-3 py-2 text-sm">
+                            <span>${typeIcon} ${pub.type}</span>
+                        </td>
+                        <td class="px-3 py-2 text-sm text-gray-500">${pub.date || 'N/A'}</td>
+                        <td class="px-3 py-2 text-sm">
+                            <span>${confidentialIcon} ${confidentialText}</span>
+                        </td>
+                        <td class="px-3 py-2 text-sm">
+                            ${pub.downloadUrl ? 
+                                `<a href="${pub.downloadUrl}" target="_blank" class="text-blue-600 hover:text-blue-800">📥 Download</a>` : 
+                                '<span class="text-gray-400">Not available</span>'
+                            }
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div></div>';
+            return html;
+            
+        } catch (error) {
+            return `<div class="text-red-600">❌ Error formatting company publications: ${error.message}</div>`;
+        }
+    }
+
+    formatDifferentialUpdates(data) {
+        try {
+            const results = JSON.parse(data.result.content[0].text);
+            
+            if (!results.success) {
+                return `<div class="text-red-600">❌ Differential updates request failed: ${results.error || 'Unknown error'}</div>`;
+            }
+
+            const updates = results.updates || {};
+            const companies = updates.companies || [];
+            
+            if (companies.length === 0) {
+                return `<div class="text-yellow-600">⚠️ No company updates found for the specified period</div>`;
+            }
+
+            let html = `<div class="space-y-4">`;
+            html += `<div class="text-lg font-semibold text-gray-800 border-b pb-2">Recent Company Updates (${companies.length} results)</div>`;
+            
+            if (updates.nextCursor) {
+                html += `<div class="text-sm text-blue-600">Next cursor available: ${updates.nextCursor}</div>`;
+            }
+            
+            html += '<div class="overflow-x-auto">';
+            html += '<table class="min-w-full divide-y divide-gray-200">';
+            html += `
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">SIREN</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Update Type</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            companies.forEach(company => {
+                const updateIcon = company.updateType === 'CREATION' ? '🆕' : 
+                                 company.updateType === 'RADIATION' ? '❌' : '✏️';
+                const updateClass = company.updateType === 'CREATION' ? 'text-green-600' : 
+                                  company.updateType === 'RADIATION' ? 'text-red-600' : 'text-blue-600';
+                
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2">
+                            <div class="font-medium text-gray-900">${company.name || 'N/A'}</div>
+                        </td>
+                        <td class="px-3 py-2">
+                            <div class="text-sm font-mono">${company.siren}</div>
+                        </td>
+                        <td class="px-3 py-2">
+                            <span class="${updateClass}">${updateIcon} ${company.updateType}</span>
+                        </td>
+                        <td class="px-3 py-2 text-sm text-gray-500">${company.updateDate || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div></div>';
+            return html;
+            
+        } catch (error) {
+            return `<div class="text-red-600">❌ Error formatting differential updates: ${error.message}</div>`;
         }
     }
 
