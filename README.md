@@ -4,9 +4,11 @@ Firmia is an MCP (Model Context Protocol) server that provides unified access to
 
 ## Table of Contents
 - [Features](#features)
+- [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
+- [Web UI](#web-ui)
 - [Available Tools](#available-tools)
 - [API Response Examples](#api-response-examples)
 - [Architecture](#architecture)
@@ -27,6 +29,29 @@ Firmia is an MCP (Model Context Protocol) server that provides unified access to
 - 🛡️ **Error Handling**: Robust error handling with detailed error messages
 - 🔄 **Automatic Retries**: Smart retry logic for transient failures
 - 📈 **Rate Limit Management**: Intelligent quota management across APIs
+- 🌐 **Web UI**: Simple web interface for testing and debugging
+- 🚀 **One-Click Launch**: Start everything with a single script
+
+## Quick Start
+
+**Fastest way to get started with Firmia:**
+
+```bash
+# Clone and launch
+git clone https://github.com/bacoco/Firmia.git
+cd Firmia
+./launch.sh
+```
+
+This will:
+1. Install all dependencies
+2. Build the project
+3. Start the MCP server
+4. Launch the web UI
+5. Open your browser automatically
+
+🌐 **Web UI**: http://localhost:3001  
+📡 **MCP Server**: http://localhost:8080
 
 ## Installation
 
@@ -158,18 +183,117 @@ npm start
 
 # With custom environment file
 NODE_ENV=production npm start
+
+# Or use the launch script (recommended)
+./launch.sh
 ```
 
 ### Testing the Connection
 
-Once the server is running, you can test it using the MCP client:
+**Option 1: Web UI (Recommended)**
+```bash
+./launch.sh
+# Opens http://localhost:3001 automatically
+```
 
+**Option 2: MCP Client**
 ```json
 {
   "tool": "get_api_status",
   "params": {}
 }
 ```
+
+## Web UI
+
+Firmia includes a **simple web interface** for testing and debugging the MCP server without requiring a separate MCP client.
+
+### Features
+
+- 🎮 **Interactive Testing**: Test all MCP tools with a user-friendly interface
+- 📊 **Real-time Status**: Monitor MCP server and API status
+- 🔄 **Server Control**: Start/stop the MCP server directly from the UI
+- 📋 **Results Display**: View formatted responses and error messages
+- ⚡ **Auto-refresh**: Automatic status updates every 10 seconds
+
+### Quick Launch
+
+```bash
+# Start everything with one command
+./launch.sh
+
+# Or manually:
+npm run build
+cd web-ui && npm install && npm start
+```
+
+### Web UI Components
+
+**Status Dashboard:**
+- MCP Server status (running/stopped)
+- API health monitoring
+- Rate limit tracking
+
+**Tool Testing:**
+- **Search Enterprises**: Test company search across all APIs
+- **Enterprise Details**: Get detailed company information by SIREN
+- **API Status**: Check health and rate limits of all connected APIs
+
+**Results Panel:**
+- Real-time response display
+- Error handling and debugging
+- Request/response history
+
+### Screenshots
+
+**Main Dashboard:**
+- Clean, modern interface with status cards
+- Real-time server monitoring
+- One-click testing tools
+
+**Search Interface:**
+- Enterprise search with filtering options
+- Support for company names and SIREN numbers
+- Configurable result limits
+
+**Results Display:**
+- Formatted JSON responses
+- Color-coded success/error states
+- Timestamped request history
+
+### Configuration
+
+The Web UI can be configured via environment variables:
+
+```bash
+# Web UI port (default: 3001)
+WEB_UI_PORT=3001
+
+# MCP Server port (default: 8080)
+MCP_PORT=8080
+
+# Auto-open browser (default: true)
+AUTO_OPEN_BROWSER=true
+```
+
+### Development
+
+To develop the Web UI:
+
+```bash
+# Install dependencies
+cd web-ui && npm install
+
+# Start in development mode
+npm run dev
+
+# The UI will auto-reload on changes
+```
+
+The Web UI uses:
+- **Frontend**: HTML5, CSS (Tailwind), Vanilla JavaScript
+- **Backend**: Express.js server
+- **Communication**: REST API with the MCP server
 
 ## Available Tools
 

@@ -95,7 +95,7 @@ export class INSEEAdapter implements BaseAdapter {
         // Text search - use different query format for new API
         endpoint = `${baseUrl}/siren`;
         if (this.useNewApi) {
-          params['q'] = `denominationUniteLegale:${query}`;
+          params['q'] = `denominationUniteLegale:"${query}"`;
         } else {
           params['q'] = `denominationUniteLegale:"${query}"`;
         }

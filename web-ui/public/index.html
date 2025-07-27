@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firmia - MCP Server Test UI</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-building text-2xl"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold">Firmia</h1>
+                        <p class="text-blue-100">French Enterprise Data Integration - MCP Test UI</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="server-status" class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                        <span class="text-sm">Checking status...</span>
+                    </div>
+                    <button id="refresh-status" class="bg-blue-500 hover:bg-blue-700 px-3 py-1 rounded text-sm">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Status Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700">Web UI</h3>
+                        <p class="text-green-600 font-medium">Running</p>
+                    </div>
+                    <i class="fas fa-globe text-3xl text-green-500"></i>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700">MCP Server</h3>
+                        <p id="mcp-status" class="text-yellow-600 font-medium">Checking...</p>
+                    </div>
+                    <i class="fas fa-server text-3xl text-blue-500"></i>
+                </div>
+                <div class="mt-4 flex space-x-2">
+                    <button id="start-mcp" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-play"></i> Start
+                    </button>
+                    <button id="stop-mcp" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
+                        <i class="fas fa-stop"></i> Stop
+                    </button>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700">API Status</h3>
+                        <p id="api-status" class="text-gray-600 font-medium">Ready to test</p>
+                    </div>
+                    <i class="fas fa-plug text-3xl text-purple-500"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- MCP Tools Testing -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Left Column: Tools -->
+            <div class="space-y-6">
+                <!-- Search Enterprises -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fas fa-search mr-2 text-blue-500"></i>
+                        Search Enterprises
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Company Name or SIREN</label>
+                            <input type="text" id="search-query" placeholder="e.g., Airbus or 383474814" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                                <select id="search-source" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="all">All Sources</option>
+                                    <option value="insee">INSEE</option>
+                                    <option value="banque-france">Banque de France</option>
+                                    <option value="inpi">INPI</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Max Results</label>
+                                <input type="number" id="search-max" value="5" min="1" max="100"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        <button id="test-search" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md transition duration-200">
+                            <i class="fas fa-search mr-2"></i>Search Enterprises
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Get Enterprise Details -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fas fa-info-circle mr-2 text-green-500"></i>
+                        Get Enterprise Details
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">SIREN Number</label>
+                            <input type="text" id="details-siren" placeholder="e.g., 383474814" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="include-financials" checked class="mr-2">
+                                <span class="text-sm text-gray-700">Include Financials</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="include-ip" checked class="mr-2">
+                                <span class="text-sm text-gray-700">Include IP Data</span>
+                            </label>
+                        </div>
+                        <button id="test-details" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md transition duration-200">
+                            <i class="fas fa-info-circle mr-2"></i>Get Details
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Get API Status -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fas fa-heartbeat mr-2 text-purple-500"></i>
+                        API Status Check
+                    </h3>
+                    <p class="text-gray-600 mb-4">Check the status and rate limits of all connected APIs.</p>
+                    <button id="test-status" class="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded-md transition duration-200">
+                        <i class="fas fa-heartbeat mr-2"></i>Check API Status
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Column: Results -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold">Results</h3>
+                    <button id="clear-results" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-trash"></i> Clear
+                    </button>
+                </div>
+                <div id="results-container" class="space-y-4">
+                    <div class="text-center text-gray-500 py-12">
+                        <i class="fas fa-clipboard-list text-4xl mb-4"></i>
+                        <p>Test results will appear here</p>
+                        <p class="text-sm mt-2">Use the tools on the left to test the MCP server</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <span>Processing request...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p>&copy; 2024 Firmia - French Enterprise Data Integration</p>
+            <p class="text-gray-400 text-sm mt-2">
+                <a href="https://github.com/bacoco/Firmia" class="hover:text-white">
+                    <i class="fab fa-github mr-1"></i>GitHub Repository
+                </a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
