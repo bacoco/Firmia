@@ -10,9 +10,14 @@ import type {
 } from "./index.js";
 
 interface INPIAuthResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
+  token: string;
+  user: {
+    id: number;
+    email: string;
+    firstname: string;
+    lastname: string;
+    roles: string[];
+  };
 }
 
 interface INPICompany {
@@ -57,7 +62,7 @@ interface INPIAttachment {
 }
 
 export class INPIAdapter implements BaseAdapter {
-  private readonly baseUrl = "https://registre-national-entreprises.inpi.fr";
+  private readonly baseUrl: string;
   private readonly username: string;
   private readonly password: string;
   private readonly rateLimiter: AdapterConfig["rateLimiter"];
@@ -71,6 +76,7 @@ export class INPIAdapter implements BaseAdapter {
     this.cache = config.cache;
     this.username = process.env['INPI_USERNAME'] || "";
     this.password = process.env['INPI_PASSWORD'] || "";
+    this.baseUrl = process.env['NEXT_PUBLIC_INPI_API_URL'] || "https://registre-national-entreprises.inpi.fr/api";
     
     if (!this.username || !this.password) {
       console.warn("INPI credentials not found in environment variables");
@@ -78,7 +84,7 @@ export class INPIAdapter implements BaseAdapter {
 
     this.axiosInstance = axios.create({
       baseURL: this.baseUrl,
-      timeout: 30000,
+      timeout: parseInt(process.env['NEXT_PUBLIC_API_TIMEOUT'] || '30000'),
       headers: {
         "Accept": "application/json",
         "Content-Type": "application/json"
@@ -107,27 +113,38 @@ export class INPIAdapter implements BaseAdapter {
 
     try {
       const response = await axios.post<INPIAuthResponse>(
-        `${this.baseUrl}/api/sso/login`,
+        `${this.baseUrl}/sso/login`,
         {
           username: this.username,
           password: this.password
         }
       );
 
-      this.authToken = response.data.access_token;
-      // Set expiry to 5 minutes before actual expiry for safety
-      this.tokenExpiry = new Date(Date.now() + (response.data.expires_in - 300) * 1000);
+      this.authToken = response.data.token;
+      
+      // Handle expiry time - default to 1 hour (86400 seconds as seen in JWT)
+      const expiresIn = 86400; // 24 hours as per INPI JWT
+      const safetyMargin = Math.min(300, expiresIn / 2); // Use 5 min or half the duration
+      
+      this.tokenExpiry = new Date(Date.now() + (expiresIn - safetyMargin) * 1000);
 
       // Cache the token
       await this.cache.set(cacheKey, {
         token: this.authToken,
         expiry: this.tokenExpiry.toISOString()
-      }, response.data.expires_in - 300);
+      }, expiresIn - safetyMargin);
 
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        throw new Error(`INPI authentication failed: ${error.response?.data?.message || error.message}`);
+        console.error('INPI Auth Error Details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url
+        });
+        throw new Error(`INPI authentication failed: ${error.response?.data?.message || error.response?.data || error.message}`);
       }
+      console.error('INPI Auth Error (non-axios):', error);
       throw error;
     }
   }
@@ -165,24 +182,34 @@ export class INPIAdapter implements BaseAdapter {
       
       if (isSiren) {
         // Direct SIREN search
-        const response = await this.makeAuthenticatedRequest<{ companies: INPICompany[] }>(
-          "/api/companies",
+        const response = await this.makeAuthenticatedRequest<INPICompany[] | { companies: INPICompany[] }>(
+          "/companies",
           {
             "siren[]": query,
-            pageSize: options.maxResults || 20
+            pageSize: Math.min(options.maxResults || 5, 5) // Limit to 5 to avoid memory issues
           }
         );
-        companies = response.companies || [];
+        // Handle different response formats
+        if (Array.isArray(response)) {
+          companies = response;
+        } else {
+          companies = (response as { companies: INPICompany[] }).companies || [];
+        }
       } else {
         // Company name search
-        const response = await this.makeAuthenticatedRequest<{ companies: INPICompany[] }>(
-          "/api/companies",
+        const response = await this.makeAuthenticatedRequest<INPICompany[] | { companies: INPICompany[] }>(
+          "/companies",
           {
             companyName: query,
-            pageSize: options.maxResults || 20
+            pageSize: Math.min(options.maxResults || 5, 5) // Limit to 5 to avoid memory issues
           }
         );
-        companies = response.companies || [];
+        // Handle different response formats
+        if (Array.isArray(response)) {
+          companies = response;
+        } else {
+          companies = (response as { companies: INPICompany[] }).companies || [];
+        }
       }
 
       const results = companies.map(company => this.transformToSearchResult(company));
@@ -217,7 +244,7 @@ export class INPIAdapter implements BaseAdapter {
     try {
       // Get company details
       const company = await this.makeAuthenticatedRequest<INPICompany>(
-        `/api/companies/${siren}`
+        `/companies/${siren}`
       );
 
       let intellectualProperty = undefined;
@@ -226,7 +253,7 @@ export class INPIAdapter implements BaseAdapter {
         // Get attachments to count intellectual property documents
         try {
           const attachments = await this.makeAuthenticatedRequest<{ attachments: INPIAttachment[] }>(
-            `/api/companies/${siren}/attachments`
+            `/companies/${siren}/attachments`
           );
           
           intellectualProperty = this.countIntellectualProperty(attachments.attachments || []);
@@ -275,15 +302,39 @@ export class INPIAdapter implements BaseAdapter {
     }
   }
 
-  private transformToSearchResult(company: INPICompany): SearchResult {
+  private transformToSearchResult(company: any): SearchResult {
+    // Handle the actual INPI API response structure
+    const siren = company.siren || company.formality?.siren || "";
+    const formality = company.formality || {};
+    const content = formality.content || {};
+    const personneMorale = content.personneMorale || {};
+    
+    // Extract company name from the correct nested structure
+    const identite = personneMorale.identite || {};
+    const entreprise = identite.entreprise || {};
+    const denomination = entreprise.denomination || "";
+    
+    // Extract address from the correct structure
+    const adresseEntreprise = personneMorale.adresseEntreprise || {};
+    const address = this.formatAddressFromINPI(adresseEntreprise, personneMorale, company);
+    
+    // Extract activity from entreprise data
+    const activite = entreprise.codeApe || company.activitySector || "";
+    
+    // Extract legal form
+    const formeJuridique = entreprise.formeJuridique || formality.formeJuridique || company.formeJuridique || "";
+    
+    // Extract creation date
+    const creationDate = entreprise.dateImmat || personneMorale.dateImmatriculation || company.dateCreation || "";
+    
     return {
-      siren: company.siren,
-      name: company.denomination || company.sigle || "",
-      legalForm: company.formeJuridique,
-      address: this.formatAddress(company),
-      activity: company.codeCategory || company.activitySector,
-      creationDate: company.dateCreation || company.dateImmatriculation,
-      status: this.determineStatus(company)
+      siren: siren,
+      name: denomination,
+      legalForm: formeJuridique,
+      address: address,
+      activity: activite,
+      creationDate: creationDate,
+      status: this.determineINPIStatus(company)
     };
   }
 
@@ -324,6 +375,30 @@ export class INPIAdapter implements BaseAdapter {
     return parts.join(" ");
   }
 
+  private formatAddressFromINPI(adresseEntreprise: any, personneMorale: any, company: any): string {
+    // Try to extract address from the nested INPI structure
+    
+    // Check if address is in adresseEntreprise.adresse
+    let adresse = adresseEntreprise.adresse;
+    
+    // Fallback to other possible locations
+    if (!adresse || Object.keys(adresse).length === 0) {
+      adresse = adresseEntreprise || personneMorale.adresse || personneMorale.adresseSiege || company.adresse;
+    }
+    
+    if (adresse && Object.keys(adresse).length > 0) {
+      const parts = [
+        adresse.numVoie || adresse.numero || adresse.numeroVoie,
+        adresse.typeVoie,
+        adresse.voie || adresse.nomVoie,
+        adresse.codePostal,
+        adresse.commune || adresse.ville || adresse.localite
+      ].filter(Boolean);
+      return parts.join(" ");
+    }
+    return "";
+  }
+
   private determineStatus(company: INPICompany): string {
     if (company.dateRadiation) {
       return "radié";
@@ -332,6 +407,23 @@ export class INPIAdapter implements BaseAdapter {
       return company.statut.toLowerCase();
     }
     return "actif";
+  }
+
+  private determineINPIStatus(company: any): string {
+    // Handle actual INPI response structure
+    const formality = company.formality || {};
+    const content = formality.content || {};
+    
+    if (content.cessationActivite || content.dissolution) {
+      return "cessé";
+    }
+    if (content.radiation) {
+      return "radié";
+    }
+    if (company.nombreEtablissementsOuverts > 0) {
+      return "actif";
+    }
+    return "actif"; // Default status
   }
 
   private countIntellectualProperty(attachments: INPIAttachment[]): {
