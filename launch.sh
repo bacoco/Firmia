@@ -78,16 +78,24 @@ fi
 
 echo -e "${GREEN}✅ Node.js and npm are available${NC}"
 
+# Get the script directory and change to it
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+echo "Working directory: $(pwd)"
+
 # Check if we're in the correct directory
 if [ ! -f "package.json" ]; then
-    echo -e "${RED}❌ package.json not found${NC}"
-    echo "Please run this script from the Firmia root directory"
+    echo -e "${RED}❌ package.json not found in $(pwd)${NC}"
+    echo "Please ensure this script is in the Firmia root directory"
     exit 1
 fi
 
 # Check if web-ui directory exists
 if [ ! -d "$WEB_UI_DIR" ]; then
     echo -e "${RED}❌ Web UI directory not found: $WEB_UI_DIR${NC}"
+    echo "Current directory: $(pwd)"
+    echo "Available directories: $(ls -d */ 2>/dev/null | head -5)"
     exit 1
 fi
 

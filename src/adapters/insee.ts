@@ -131,7 +131,7 @@ export class INSEEAdapter implements BaseAdapter {
         }
         
         // If still no results, return first few results as suggestions
-        if (filteredResults.length === 0) {
+        if (filteredResults.length === 0 && results.length > 0) {
           filteredResults = results.slice(0, Math.min(5, options.maxResults || 5));
         }
         
@@ -285,6 +285,10 @@ export class INSEEAdapter implements BaseAdapter {
 
   private transformSearchResults(data: any): SearchResult[] {
     if (!data || !data.unitesLegales) {
+      return [];
+    }
+
+    if (data.unitesLegales.length === 0) {
       return [];
     }
 
